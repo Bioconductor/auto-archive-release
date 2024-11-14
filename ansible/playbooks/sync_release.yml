@@ -1,0 +1,8 @@
+---
+- name: Sync Bioconductor Release
+  hosts: bioc_vm
+  become: yes
+  vars:
+    bioc_version: "{{ biocver | default('3.19') }}"
+  roles:
+    - bioc_sync

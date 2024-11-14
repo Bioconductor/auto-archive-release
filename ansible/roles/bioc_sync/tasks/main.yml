@@ -1,0 +1,45 @@
+---
+- name: Create work directory
+  file:
+    path: "/tmp/bioc_sync"
+    state: directory
+    mode: '0755'
+
+- name: Copy rsync key
+  copy:
+    content: "{{ lookup('env', 'RSYNC_PRIVATE_KEY') }}"
+    dest: "/tmp/bioc_sync/rsync-key.pem"
+    mode: '0600'
+
+- name: Create temporary rclone config directory
+  file:
+    path: "/tmp/bioc_sync/rclone"
+    state: directory
+    mode: '0700'
+
+- name: Write rclone config
+  copy:
+    content: "{{ lookup('env', 'RCLONE_CONF_CONTENTS') }}"
+    dest: "/tmp/bioc_sync/rclone/rclone.conf"
+    mode: '0600'
+
+- name: Create paths file
+  template:
+    src: paths.j2
+    dest: /tmp/paths
+    mode: '0644'
+
+- name: Run rsync
+  shell: |
+    rsync -e "ssh -i /tmp/bioc_sync/rsync-key.pem" -zrtlv bioc-rsync@master.bioconductor.org:{{ bioc_version }} ./
+
+- name: Run rclone sync
+  environment:
+    RCLONE_CONFIG: "/tmp/bioc_sync/rclone/rclone.conf"
+  shell: |
+    cat /tmp/paths | xargs -i rclone copyto -vvv ./{}  osn:/bir190004-bucket01/archive.bioconductor.org/packages/{}
+
+- name: Cleanup
+  file:
+    path: "/tmp/bioc_sync"
+    state: absent

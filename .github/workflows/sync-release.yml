@@ -1,0 +1,39 @@
+name: Sync Bioconductor Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bioc_version:
+        description: 'Bioconductor version to sync'
+        required: true
+        default: '3.19'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/vm_key
+          chmod 600 ~/.ssh/vm_key
+          echo "${{ secrets.RSYNC_PRIVATE_KEY }}" > rsync-key.pem
+          chmod 600 rsync-key.pem
+
+      - name: Run Ansible playbook
+        env:
+          BIOC_VM_IP: ${{ secrets.BIOC_VM_IP }}
+          SSH_KEY_PATH: ~/.ssh/vm_key
+          RSYNC_PRIVATE_KEY: ${{ secrets.RSYNC_PRIVATE_KEY }}
+          RCLONE_CONF_CONTENTS: ${{ secrets.RCLONE_CONF_CONTENTS }}
+        run: |
+          ansible-playbook -i ansible/inventory/hosts.yml \
+            ansible/playbooks/sync_release.yml \
+            --extra-vars "biocver=${{ github.event.inputs.bioc_version }}"
